@@ -41,6 +41,7 @@
             salirToolStripMenuItem = new ToolStripMenuItem();
             mToolStripMenuItem = new ToolStripMenuItem();
             automáticoToolStripMenuItem = new ToolStripMenuItem();
+            configuraciónToolStripMenuItem = new ToolStripMenuItem();
             menuStrip1.SuspendLayout();
             SuspendLayout();
             // 
@@ -63,7 +64,7 @@
             // 
             // archivoToolStripMenuItem
             // 
-            archivoToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { abrirToolStripMenuItem, guardarToolStripMenuItem, guardarComoToolStripMenuItem, salirToolStripMenuItem });
+            archivoToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { abrirToolStripMenuItem, guardarToolStripMenuItem, guardarComoToolStripMenuItem, configuraciónToolStripMenuItem, salirToolStripMenuItem });
             archivoToolStripMenuItem.Name = "archivoToolStripMenuItem";
             archivoToolStripMenuItem.Size = new Size(60, 20);
             archivoToolStripMenuItem.Text = "Archivo";
@@ -129,18 +130,34 @@
             automáticoToolStripMenuItem.Size = new Size(180, 22);
             automáticoToolStripMenuItem.Text = "Automático";
             // 
+            // configuraciónToolStripMenuItem
+            // 
+            configuraciónToolStripMenuItem.Name = "configuraciónToolStripMenuItem";
+            configuraciónToolStripMenuItem.Size = new Size(150, 22);
+            configuraciónToolStripMenuItem.Text = "Configuración";
+            // 
             // Form1
             // 
+            panelContent = new System.Windows.Forms.Panel();
+            panelContent.SuspendLayout();
+
+            panelContent.Dock     = System.Windows.Forms.DockStyle.Fill;
+            panelContent.Location = new Point(0, 24);
+            panelContent.Name     = "panelContent";
+
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 450);
+            ClientSize = new Size(800, 600);
+            Controls.Add(panelContent);
             Controls.Add(statusStrip1);
             Controls.Add(menuStrip1);
             MainMenuStrip = menuStrip1;
             Name = "Form1";
-            Text = "Form1";
+            MinimumSize = new Size(820, 640);
+            Text = "PC7866 – Test Resistivo Embega";
             menuStrip1.ResumeLayout(false);
             menuStrip1.PerformLayout();
+            panelContent.ResumeLayout(false);
             ResumeLayout(false);
             PerformLayout();
         }
@@ -160,5 +177,7 @@
         private ToolStripMenuItem acercaDeToolStripMenuItem;
         private ToolStripMenuItem mToolStripMenuItem;
         private ToolStripMenuItem automáticoToolStripMenuItem;
+        private ToolStripMenuItem configuraciónToolStripMenuItem;
+        private System.Windows.Forms.Panel panelContent;
     }
 }
