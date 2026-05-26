@@ -205,3 +205,4 @@ por lo que siempre podremos saber con qué parámetros se ha realizado cada ensa
 		- resistencia_medida (FLOAT) - Valor de resistencia medido durante el ensayo.
 
 
+- PRUEBA DE GIT
