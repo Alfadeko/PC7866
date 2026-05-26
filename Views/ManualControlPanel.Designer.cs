@@ -82,6 +82,7 @@ partial class ManualControlPanel
         btnSaveRead     = new System.Windows.Forms.Button();
         btnSaveView     = new System.Windows.Forms.Button();
 
+
         grpReset        = new System.Windows.Forms.GroupBox();
         btnReset        = new System.Windows.Forms.Button();
 
@@ -356,7 +357,7 @@ partial class ManualControlPanel
         // ═══════════════════════════════════════════════════════════════════
         grpFilter.Text    = "I – Filtros";
         grpFilter.Dock    = System.Windows.Forms.DockStyle.Top;
-        grpFilter.Height  = 310;
+        grpFilter.Height  = 290;
         grpFilter.Enabled = false;
         grpFilter.Font    = new System.Drawing.Font("Segoe UI", 9f, System.Drawing.FontStyle.Bold);
 

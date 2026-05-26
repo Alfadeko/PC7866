@@ -31,25 +31,23 @@
             statusStrip1 = new StatusStrip();
             menuStrip1 = new MenuStrip();
             archivoToolStripMenuItem = new ToolStripMenuItem();
+            configuraciónToolStripMenuItem = new ToolStripMenuItem();
+            salirToolStripMenuItem = new ToolStripMenuItem();
             modoToolStripMenuItem = new ToolStripMenuItem();
+            mToolStripMenuItem = new ToolStripMenuItem();
+            automáticoToolStripMenuItem = new ToolStripMenuItem();
             parámetrosToolStripMenuItem = new ToolStripMenuItem();
             informesToolStripMenuItem = new ToolStripMenuItem();
             acercaDeToolStripMenuItem = new ToolStripMenuItem();
-            abrirToolStripMenuItem = new ToolStripMenuItem();
-            guardarToolStripMenuItem = new ToolStripMenuItem();
-            guardarComoToolStripMenuItem = new ToolStripMenuItem();
-            salirToolStripMenuItem = new ToolStripMenuItem();
-            mToolStripMenuItem = new ToolStripMenuItem();
-            automáticoToolStripMenuItem = new ToolStripMenuItem();
-            configuraciónToolStripMenuItem = new ToolStripMenuItem();
+            panelContent = new Panel();
             menuStrip1.SuspendLayout();
             SuspendLayout();
             // 
             // statusStrip1
             // 
-            statusStrip1.Location = new Point(0, 428);
+            statusStrip1.Location = new Point(0, 579);
             statusStrip1.Name = "statusStrip1";
-            statusStrip1.Size = new Size(800, 22);
+            statusStrip1.Size = new Size(804, 22);
             statusStrip1.TabIndex = 0;
             statusStrip1.Text = "statusStrip1";
             // 
@@ -58,16 +56,28 @@
             menuStrip1.Items.AddRange(new ToolStripItem[] { archivoToolStripMenuItem, modoToolStripMenuItem, parámetrosToolStripMenuItem, informesToolStripMenuItem, acercaDeToolStripMenuItem });
             menuStrip1.Location = new Point(0, 0);
             menuStrip1.Name = "menuStrip1";
-            menuStrip1.Size = new Size(800, 24);
+            menuStrip1.Size = new Size(804, 24);
             menuStrip1.TabIndex = 1;
             menuStrip1.Text = "menuStrip1";
             // 
             // archivoToolStripMenuItem
             // 
-            archivoToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { abrirToolStripMenuItem, guardarToolStripMenuItem, guardarComoToolStripMenuItem, configuraciónToolStripMenuItem, salirToolStripMenuItem });
+            archivoToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { configuraciónToolStripMenuItem, salirToolStripMenuItem });
             archivoToolStripMenuItem.Name = "archivoToolStripMenuItem";
             archivoToolStripMenuItem.Size = new Size(60, 20);
             archivoToolStripMenuItem.Text = "Archivo";
+            // 
+            // configuraciónToolStripMenuItem
+            // 
+            configuraciónToolStripMenuItem.Name = "configuraciónToolStripMenuItem";
+            configuraciónToolStripMenuItem.Size = new Size(180, 22);
+            configuraciónToolStripMenuItem.Text = "Configuración";
+            // 
+            // salirToolStripMenuItem
+            // 
+            salirToolStripMenuItem.Name = "salirToolStripMenuItem";
+            salirToolStripMenuItem.Size = new Size(180, 22);
+            salirToolStripMenuItem.Text = "Salir";
             // 
             // modoToolStripMenuItem
             // 
@@ -75,6 +85,18 @@
             modoToolStripMenuItem.Name = "modoToolStripMenuItem";
             modoToolStripMenuItem.Size = new Size(51, 20);
             modoToolStripMenuItem.Text = "Modo";
+            // 
+            // mToolStripMenuItem
+            // 
+            mToolStripMenuItem.Name = "mToolStripMenuItem";
+            mToolStripMenuItem.Size = new Size(180, 22);
+            mToolStripMenuItem.Text = "Manual";
+            // 
+            // automáticoToolStripMenuItem
+            // 
+            automáticoToolStripMenuItem.Name = "automáticoToolStripMenuItem";
+            automáticoToolStripMenuItem.Size = new Size(180, 22);
+            automáticoToolStripMenuItem.Text = "Automático";
             // 
             // parámetrosToolStripMenuItem
             // 
@@ -94,70 +116,28 @@
             acercaDeToolStripMenuItem.Size = new Size(72, 20);
             acercaDeToolStripMenuItem.Text = "Acerca De";
             // 
-            // abrirToolStripMenuItem
+            // panelContent
             // 
-            abrirToolStripMenuItem.Name = "abrirToolStripMenuItem";
-            abrirToolStripMenuItem.Size = new Size(180, 22);
-            abrirToolStripMenuItem.Text = "Abrir";
-            // 
-            // guardarToolStripMenuItem
-            // 
-            guardarToolStripMenuItem.Name = "guardarToolStripMenuItem";
-            guardarToolStripMenuItem.Size = new Size(180, 22);
-            guardarToolStripMenuItem.Text = "Guardar";
-            // 
-            // guardarComoToolStripMenuItem
-            // 
-            guardarComoToolStripMenuItem.Name = "guardarComoToolStripMenuItem";
-            guardarComoToolStripMenuItem.Size = new Size(180, 22);
-            guardarComoToolStripMenuItem.Text = "Guardar como";
-            // 
-            // salirToolStripMenuItem
-            // 
-            salirToolStripMenuItem.Name = "salirToolStripMenuItem";
-            salirToolStripMenuItem.Size = new Size(180, 22);
-            salirToolStripMenuItem.Text = "Salir";
-            // 
-            // mToolStripMenuItem
-            // 
-            mToolStripMenuItem.Name = "mToolStripMenuItem";
-            mToolStripMenuItem.Size = new Size(180, 22);
-            mToolStripMenuItem.Text = "Manual";
-            // 
-            // automáticoToolStripMenuItem
-            // 
-            automáticoToolStripMenuItem.Name = "automáticoToolStripMenuItem";
-            automáticoToolStripMenuItem.Size = new Size(180, 22);
-            automáticoToolStripMenuItem.Text = "Automático";
-            // 
-            // configuraciónToolStripMenuItem
-            // 
-            configuraciónToolStripMenuItem.Name = "configuraciónToolStripMenuItem";
-            configuraciónToolStripMenuItem.Size = new Size(150, 22);
-            configuraciónToolStripMenuItem.Text = "Configuración";
+            panelContent.Dock = DockStyle.Fill;
+            panelContent.Location = new Point(0, 24);
+            panelContent.Name = "panelContent";
+            panelContent.Size = new Size(804, 555);
+            panelContent.TabIndex = 0;
             // 
             // Form1
             // 
-            panelContent = new System.Windows.Forms.Panel();
-            panelContent.SuspendLayout();
-
-            panelContent.Dock     = System.Windows.Forms.DockStyle.Fill;
-            panelContent.Location = new Point(0, 24);
-            panelContent.Name     = "panelContent";
-
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 600);
+            ClientSize = new Size(804, 601);
             Controls.Add(panelContent);
             Controls.Add(statusStrip1);
             Controls.Add(menuStrip1);
             MainMenuStrip = menuStrip1;
-            Name = "Form1";
             MinimumSize = new Size(820, 640);
+            Name = "Form1";
             Text = "PC7866 – Test Resistivo Embega";
             menuStrip1.ResumeLayout(false);
             menuStrip1.PerformLayout();
-            panelContent.ResumeLayout(false);
             ResumeLayout(false);
             PerformLayout();
         }
@@ -167,9 +147,6 @@
         private StatusStrip statusStrip1;
         private MenuStrip menuStrip1;
         private ToolStripMenuItem archivoToolStripMenuItem;
-        private ToolStripMenuItem abrirToolStripMenuItem;
-        private ToolStripMenuItem guardarToolStripMenuItem;
-        private ToolStripMenuItem guardarComoToolStripMenuItem;
         private ToolStripMenuItem salirToolStripMenuItem;
         private ToolStripMenuItem modoToolStripMenuItem;
         private ToolStripMenuItem parámetrosToolStripMenuItem;

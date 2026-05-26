@@ -105,4 +105,27 @@ public class CommandParser
             }
         }
     }
+
+    /// <summary>
+    /// Parsea la respuesta del comando F (analógicas filtradas en voltios).
+    /// Formato esperado: "1.234 4.567 3.210 0.123"  (cuatro valores separados por espacios).
+    /// Devuelve null si no se puede parsear.
+    /// </summary>
+    public float[]? ParseAnalogValues(string response)
+    {
+        if (string.IsNullOrWhiteSpace(response)) return null;
+
+        var parts = response.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2) return null;
+
+        var values = new List<float>();
+        foreach (var part in parts)
+        {
+            if (float.TryParse(part, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float v))
+                values.Add(v);
+        }
+
+        return values.Count >= 2 ? values.ToArray() : null;
+    }
 }

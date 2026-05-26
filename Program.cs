@@ -4,11 +4,17 @@ namespace PC7866
 {
     internal static class Program
     {
-        [STAThread]
-        static void Main()
+        //namespace PC7866;
+
+        internal static class Programm
         {
-            ApplicationConfiguration.Initialize();
-            Application.Run(new Form1());
+            [STAThread]
+            static void Main()
+            {
+                Console.OutputEncoding = System.Text.Encoding.UTF8;
+                ApplicationConfiguration.Initialize();
+                Application.Run(new Form1());
+            }
         }
     }
 }

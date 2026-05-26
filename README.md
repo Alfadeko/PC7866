@@ -11,7 +11,16 @@ a formatos como CSV o Excel para su posterior análisis o presentación.
 ## Tabla de contenido
 - [Instalación](#instalación)
 - [Uso](#uso)
-- [Protocolo de comunicación](#protocolo-de-comunicación)]
+	- [Interfaz de usuario](#interfaz-de-usuario)
+	- [Manual](#modo manual)
+	- [Automático](#modo automático)
+	- [Resultados](#resultados)
+
+
+- [Protocolo de comunicación](#protocolo-de-comunicación)
+- [Base de datos](#base-de-datos)
+	- [Referencias](#referencias)
+	- [Resultados](#resultados)
 
 ## Instalación
 
@@ -24,7 +33,37 @@ a formatos como CSV o Excel para su posterior análisis o presentación.
 
 
 ## Uso
+### Interfaz de usuario
+La interfaz de usuario sigue el diseño clásico de aplicaciones windows genéricas, con un menu superior para acceder 
+a las diferentes funcionalidades, y una zona central para la configuración de los parámetros de prueba, la ejecución
+del test y la visualización de los resultados. No está pensada como una aplicación "responsive", sin que se ha diseñado para una
+resolución FULL-HD. 
+En la parte inferior, se muestra una barra de estado para indicar el estado actual de la aplicación, como por ejemplo "Conectado al dispositivo",
+"Modo automático", las descripción de las etapas de la prueba, etc.
+En resto de pantalla queda definida con un marco modal donde mostraremos:
+	
+	- Manual. 
+	- Automático o modo de trabajo normal. Muestra la imagen de la referencia a ensayar, indicando mediante un punto en gris los no medidos, 
+		en rojo los NOK y verde los OK los parámetros de ensayo configurados para dicha referencia, un botón para iniciar el ensayo, 
+		una zona de visualización de los resultados detallados del ensayo, y un botón para finalizar el ensayo. 
+		Tendrá un campo para introducir el lote, el operario, etc.
+	- Informes o resultados, donde poder explorar los resultados de las pruebas realizadas, con opciones de filtrado, búsqueda y exportación de datos.
+	- Parámetros: Aquí se configuran las diferentes referencias a ensayar, según la tabla de referencias de la base de datos, y los parámetros de ensayo asociados a cada referencia.
+		( Tabla parámetros ensayo) Tendrá tantos campos como la tabla "referencias" (ver más abajo), así como una tabla gráfica.
+		En esta tabla gráfica, se mostrarán los parámetros de ensayo asociados a cada referencia, y se podrán modificar o eliminar.
+	- Configuración (Accesible desde Archivo - Configuración): Desde aquí se configuran los parámetros de comunicación, como el puerto y la velocidad de comunicación.
 
+
+El modo manual nos permite realizar una prueba de comunicación, realizar mediciones individuales activando salidas de forma manual, 
+y visualizar los resultados de cada medición. Permite seleccionar el puerto de comunicación y la velocidad de comunicación.
+Inicialmente este modo se ha utilizado para el desarrollo y la depuración, pero se mantendrá en la aplicación final para permitir pruebas puntuales o de diagnóstico.
+El modo automático muestra la visualización normal de la aplicación. En esta visualización tendremos:
+ - Configuración de los parámetros de ensayo, como la referencia a ensayar, el lote, el operario, etc.
+ - Una imagen (Si se ha configurado en la referencia) de la referencia a ensayar. En esta imagen se mostrará mediante un código de 
+colores el resultado en un circulo: Gris para no ensayado, verde para bueno y rojo para malo. 
+ - Un botón para iniciar el ensayo, el cual se irá actualizando con la etapa del ensayo que se esté realizando en cada momento.
+ - Una zona de visualización de los resultados, donde se mostrarán los resultados detallados de cada paso del ensayo, como por ejemplo la resistencia medida, el resultado OK/NOK, etc.
+ - Un botón para finalizar el ensayo, el cual guardará los resultados en la base de datos y permitirá la exportación de los resultados a formatos como CSV o Excel.
 
 ## Procolo de comunicación
  Comandos:
@@ -98,15 +137,71 @@ FLAGS:
  
 ==== COMANDO G Guardado de parámetros en memoria no volátil y lectura de estos. ====
 Un segundo byte ASCII indicará la operación a realizar:
-- "0x47" ("G") - Guardar en EEPROM los parámetros actuales en RAM
-- "0x4C" ("L") - Leer desde EEPROM los parámetros actuales hacia la RAM
+- 0x47 ("G") - Guardar en EEPROM los parámetros actuales en RAM
+- 0x4C ("L") - Leer desde EEPROM los parámetros actuales hacia la RAM
 Para los dos comandos anteriores, la respuesta es:
 - 0x4F ("O") - OK - Tras el guardado en EEPROM
 - 0x4E ("N") - NOK - Fallo en el guardado.
-- "0x56" ("V") - Visualizar por el puerto serie los valores actuales en RAM para los FLAGS y los coeficientes.
+- 0x56 ("V") - Visualizar por el puerto serie los valores actuales en RAM para los FLAGS y los coeficientes.
 En este caso la respuesta serán los valores con el mismo formato que el comando I.
 					
 	- Se empleará ESP-IDF versión V6.0.1 como api de programación, ya que está más optimizada para este microcontrolador.
 
 La comunicación por defecto es 115200bps, y normalmente en el COM4. Este puerto puede variar según el PC y la configuración del mismo. 
 Los valores de comunicación en una pantalla de configuración de parámetros.
+
+
+## Base de datos:
+	Se preven dos tablas en la base de datos, una para almacenar los resultados de las pruebas y otra para almacenar los parámetros de 
+ensayo de cada referencia.
+
+
+### Referencias
+	La tabla referencias almacenará información sobre cada referencia que se pruebe, incluyendo su nombre, descripción y fechas de creación y modificación.
+Además tiene una tabla subornidada para almacenar los parámetros de ensayo asociados a cada referencia, en la que se incluirán
+los valores necesarios para hacer el ensayo de dicha referenica.
+	- Tabla "Referencias":
+		- id (INT, PRIMARY KEY, AUTO_INCREMENT)
+		- bActiva (BOOLEAN) - Indica si es la referencia activa. Cada vez que realicemos una modificación de los parametros
+de ensayo, se creará una nueva referencia con los nuevos parámetros, y se marcará como activa, mientras que la referencia anterior se marcará
+como inactiva. De esta forma, siempre tendremos un histórico de las referencias utilizadas en cada ensayo, siguiendo el id. La selección
+del ensayo a trabajar se hará mediante la selección de la referencia activa, y se mostrarán los parámetros de ensayo asociados a dicha referencia.
+También se permitirá ver las anteriores y seleccionar cualquiera de ellas para trabajar con sus parámetros de ensayo asociados.
+		- referencia (VARCHAR(255), UNIQUE) - Nombre o código de la referencia.
+		- descripcion (TEXT) - Descripción detallada de la referencia.
+		- fecha_creacion (DATETIME) - Fecha y hora de creación de la referencia.
+		- fecha_modificacion (DATETIME) - Fecha y hora de la última modificación de la referencia.
+		- imagen (BLOB) - Imagen de la referencia, para mostrar en la aplicación durante el ensayo.
+		
+	- Tabla "ParametrosEnsayo":
+		- id (INT, PRIMARY KEY, AUTO_INCREMENT)
+		- referencia_id (INT) - Clave foránea que relaciona con la tabla Referencias.
+		- nombre_contacto (VARCHAR(20)) - Nombre del contacto a ensayar
+		- nPasoEnsayo (INT) - Número de paso del ensayo, para definir la secuencia de pasos a realizar en el ensayo.
+		- nSalida (boolarray) - Array de 48 bool para indicar las salidas a activar en el ensayo. 
+		- resistenciaNominal (float) - Valor de resistencia aceptado como bueno (Centro).
+		- tolerancia (float) - Tolerancia aceptada para el ensayo, por ejemplo, un ohm de la resistencia nominal.
+		- offset (float) - Valor de offset a restar a la resistencia medida, para compensar la caída óhmica adicional.
+		- fecha_creacion (DATETIME) - Fecha y hora de creación del parámetro de ensayo.
+		- fecha_modificacion (DATETIME) - Fecha y hora de la última modificación del parámetro de ensayo.
+		- posX (INT) - Posición X del punto (dot) en la imagen para mostrar gráficamente la posición del contacto a ensayar.
+		- posY (INT) - Posición Y del punto (dot) en la imagen para mostrar gráficamente la posición del contacto a ensayar.
+
+### Resultados
+		La tabla de resultados almacenará los resultados de cada ensayo, registrando al operario que los ha realizado,
+el idReferenica (Para poder consultar los parámetros) el lote, la fecha y hora de realización del ensayo, el resultado total del ensayo
+(Bueno/Malo). En una segunda tabla auxiliar, se almacenarán los resultados detallados de cada ensayo, como por ejemplo la resistencia
+medida en cada paso del ensayo, la evaluación OK,NOK, y el valor analógico RAW.. 
+	- Tabla "Resultados":
+		- id (INT, PRIMARY KEY, AUTO_INCREMENT)
+		- referencia_id (INT) - Clave foránea que relaciona con la tabla Referencias. Esta nos da trazabilidad de los parámetros con
+los que se ha realizado el ensayo, ya que cada referencia tiene asociados unos parámetros de ensayo, y cada resultado se asocia a una referencia,
+por lo que siempre podremos saber con qué parámetros se ha realizado cada ensayo, garantizando la trazabilidad de los ensayos realizados.
+		- fecha_prueba (DATETIME) - Fecha y hora de realización de la prueba.
+		- resultado (BOOLEAN) - Resultado total del ensayo.
+	- Tabla "ResultadosDetalle":
+		- id (INT, PRIMARY KEY, AUTO_INCREMENT)
+		- resultado_id (INT) - Clave foránea que relaciona con la tabla Resultados, para saber a qué ensayo corresponde cada resultado detallado.
+		- resistencia_medida (FLOAT) - Valor de resistencia medido durante el ensayo.
+
+

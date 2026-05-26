@@ -1,4 +1,4 @@
-using Dapper;
+﻿using Dapper;
 using MySqlConnector;
 using PC7866.Models;
 using System.Text.Json;
@@ -6,7 +6,8 @@ using System.Text.Json;
 namespace PC7866.Services.Database;
 
 /// <summary>
-/// Implementación de acceso a MariaDB mediante Dapper
+/// ImplementaciÃ³n de acceso a MariaDB mediante Dapper.
+/// Schema: referencias, parametros_ensayo, resultados, resultados_detalle.
 /// </summary>
 public class TestRepository : ITestRepository
 {
@@ -19,180 +20,60 @@ public class TestRepository : ITestRepository
 
     private MySqlConnection CreateConnection() => new(_connectionString);
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // TestParameters
-    // ─────────────────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Referencias
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    public async Task<IEnumerable<TestParameters>> GetAllTestParametersAsync()
+    public async Task<IEnumerable<Referencia>> GetAllReferenciasAsync(bool soloActivas = false)
     {
-        const string sql = """
-            SELECT id, test_name, device_model, timeout_ms, tolerance_percent,
-                   created_date, description, command_sequence_json
-            FROM test_parameters
-            ORDER BY created_date DESC
-            """;
+        string sql = soloActivas
+            ? "SELECT * FROM referencias WHERE b_activa = TRUE ORDER BY fecha_creacion DESC"
+            : "SELECT * FROM referencias ORDER BY fecha_creacion DESC";
 
         using var conn = CreateConnection();
         var rows = await conn.QueryAsync(sql);
-        return rows.Select(MapTestParameters);
+        return rows.Select(MapReferencia);
     }
 
-    public async Task<TestParameters?> GetTestParametersByIdAsync(int id)
+    public async Task<Referencia?> GetReferenciaByIdAsync(int id)
     {
-        const string sql = """
-            SELECT id, test_name, device_model, timeout_ms, tolerance_percent,
-                   created_date, description, command_sequence_json
-            FROM test_parameters
-            WHERE id = @Id
-            """;
-
+        const string sql = "SELECT * FROM referencias WHERE id = @Id";
         using var conn = CreateConnection();
         var row = await conn.QueryFirstOrDefaultAsync(sql, new { Id = id });
-        return row is null ? null : MapTestParameters(row);
+        return row is null ? null : MapReferencia(row);
     }
 
-    public async Task<int> InsertTestParametersAsync(TestParameters p)
+    public async Task<int> InsertReferenciaAsync(Referencia r)
     {
         const string sql = """
-            INSERT INTO test_parameters
-                (test_name, device_model, timeout_ms, tolerance_percent,
-                 created_date, description, command_sequence_json)
+            INSERT INTO referencias
+                (b_activa, referencia, descripcion, fecha_creacion, fecha_modificacion, imagen)
             VALUES
-                (@TestName, @DeviceModel, @TimeoutMs, @TolerancePercent,
-                 @CreatedDate, @Description, @CommandSequenceJson);
+                (@BActiva, @Referencia, @Descripcion, @FechaCreacion, @FechaModificacion, @Imagen);
             SELECT LAST_INSERT_ID();
             """;
 
         using var conn = CreateConnection();
         return await conn.ExecuteScalarAsync<int>(sql, new
         {
-            p.TestName,
-            p.DeviceModel,
-            p.TimeoutMs,
-            p.TolerancePercent,
-            p.CreatedDate,
-            p.Description,
-            CommandSequenceJson = JsonSerializer.Serialize(p.CommandSequence)
+            r.BActiva,
+            Referencia    = r.ReferenciaNombre,
+            r.Descripcion,
+            r.FechaCreacion,
+            r.FechaModificacion,
+            r.Imagen
         });
     }
 
-    public async Task UpdateTestParametersAsync(TestParameters p)
+    public async Task UpdateReferenciaAsync(Referencia r)
     {
         const string sql = """
-            UPDATE test_parameters SET
-                test_name           = @TestName,
-                device_model        = @DeviceModel,
-                timeout_ms          = @TimeoutMs,
-                tolerance_percent   = @TolerancePercent,
-                description         = @Description,
-                command_sequence_json = @CommandSequenceJson
-            WHERE id = @Id
-            """;
-
-        using var conn = CreateConnection();
-        await conn.ExecuteAsync(sql, new
-        {
-            p.Id,
-            p.TestName,
-            p.DeviceModel,
-            p.TimeoutMs,
-            p.TolerancePercent,
-            p.Description,
-            CommandSequenceJson = JsonSerializer.Serialize(p.CommandSequence)
-        });
-    }
-
-    public async Task DeleteTestParametersAsync(int id)
-    {
-        const string sql = "DELETE FROM test_parameters WHERE id = @Id";
-        using var conn = CreateConnection();
-        await conn.ExecuteAsync(sql, new { Id = id });
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // TestResult
-    // ─────────────────────────────────────────────────────────────────────────
-
-    public async Task<IEnumerable<TestResult>> GetAllTestResultsAsync()
-    {
-        const string sql = """
-            SELECT id, test_parameters_id, execution_date, status,
-                   observations, duration_ms, operator_name, serial_number,
-                   measurements_json
-            FROM test_results
-            ORDER BY execution_date DESC
-            """;
-
-        using var conn = CreateConnection();
-        var rows = await conn.QueryAsync(sql);
-        return rows.Select(MapTestResult);
-    }
-
-    public async Task<IEnumerable<TestResult>> GetTestResultsByParametersIdAsync(int parametersId)
-    {
-        const string sql = """
-            SELECT id, test_parameters_id, execution_date, status,
-                   observations, duration_ms, operator_name, serial_number,
-                   measurements_json
-            FROM test_results
-            WHERE test_parameters_id = @ParametersId
-            ORDER BY execution_date DESC
-            """;
-
-        using var conn = CreateConnection();
-        var rows = await conn.QueryAsync(sql, new { ParametersId = parametersId });
-        return rows.Select(MapTestResult);
-    }
-
-    public async Task<TestResult?> GetTestResultByIdAsync(int id)
-    {
-        const string sql = """
-            SELECT id, test_parameters_id, execution_date, status,
-                   observations, duration_ms, operator_name, serial_number,
-                   measurements_json
-            FROM test_results
-            WHERE id = @Id
-            """;
-
-        using var conn = CreateConnection();
-        var row = await conn.QueryFirstOrDefaultAsync(sql, new { Id = id });
-        return row is null ? null : MapTestResult(row);
-    }
-
-    public async Task<int> InsertTestResultAsync(TestResult r)
-    {
-        const string sql = """
-            INSERT INTO test_results
-                (test_parameters_id, execution_date, status, observations,
-                 duration_ms, operator_name, serial_number, measurements_json)
-            VALUES
-                (@TestParametersId, @ExecutionDate, @Status, @Observations,
-                 @DurationMs, @OperatorName, @SerialNumber, @MeasurementsJson);
-            SELECT LAST_INSERT_ID();
-            """;
-
-        using var conn = CreateConnection();
-        return await conn.ExecuteScalarAsync<int>(sql, new
-        {
-            r.TestParametersId,
-            r.ExecutionDate,
-            Status = r.Status.ToString(),
-            r.Observations,
-            DurationMs = (long)r.Duration.TotalMilliseconds,
-            r.OperatorName,
-            r.SerialNumber,
-            MeasurementsJson = JsonSerializer.Serialize(r.Measurements)
-        });
-    }
-
-    public async Task UpdateTestResultAsync(TestResult r)
-    {
-        const string sql = """
-            UPDATE test_results SET
-                status           = @Status,
-                observations     = @Observations,
-                duration_ms      = @DurationMs,
-                measurements_json = @MeasurementsJson
+            UPDATE referencias SET
+                b_activa           = @BActiva,
+                referencia         = @Referencia,
+                descripcion        = @Descripcion,
+                fecha_modificacion = @FechaModificacion,
+                imagen             = @Imagen
             WHERE id = @Id
             """;
 
@@ -200,16 +81,216 @@ public class TestRepository : ITestRepository
         await conn.ExecuteAsync(sql, new
         {
             r.Id,
-            Status = r.Status.ToString(),
-            r.Observations,
-            DurationMs = (long)r.Duration.TotalMilliseconds,
-            MeasurementsJson = JsonSerializer.Serialize(r.Measurements)
+            r.BActiva,
+            Referencia         = r.ReferenciaNombre,
+            r.Descripcion,
+            r.FechaModificacion,
+            r.Imagen
         });
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    public async Task SetReferenciaActivaAsync(int id, bool activa)
+    {
+        const string sql = "UPDATE referencias SET b_activa = @Activa, fecha_modificacion = NOW() WHERE id = @Id";
+        using var conn = CreateConnection();
+        await conn.ExecuteAsync(sql, new { Id = id, Activa = activa });
+    }
+
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ParametrosEnsayo
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    public async Task<IEnumerable<ParametroEnsayo>> GetParametrosByReferenciaAsync(int referenciaId)
+    {
+        const string sql = """
+            SELECT * FROM parametros_ensayo
+            WHERE referencia_id = @ReferenciaId
+            ORDER BY n_paso_ensayo
+            """;
+
+        using var conn = CreateConnection();
+        var rows = await conn.QueryAsync(sql, new { ReferenciaId = referenciaId });
+        return rows.Select(MapParametroEnsayo);
+    }
+
+    public async Task<ParametroEnsayo?> GetParametroByIdAsync(int id)
+    {
+        const string sql = "SELECT * FROM parametros_ensayo WHERE id = @Id";
+        using var conn = CreateConnection();
+        var row = await conn.QueryFirstOrDefaultAsync(sql, new { Id = id });
+        return row is null ? null : MapParametroEnsayo(row);
+    }
+
+    public async Task<int> InsertParametroAsync(ParametroEnsayo p)
+    {
+        const string sql = """
+            INSERT INTO parametros_ensayo
+                (referencia_id, nombre_contacto, n_paso_ensayo, n_salida_json,
+                 resistencia_nominal, tolerancia, offset_val,
+                 fecha_creacion, fecha_modificacion, pos_x, pos_y)
+            VALUES
+                (@ReferenciaId, @NombreContacto, @NPasoEnsayo, @NSalidaJson,
+                 @ResistenciaNominal, @Tolerancia, @Offset,
+                 @FechaCreacion, @FechaModificacion, @PosX, @PosY);
+            SELECT LAST_INSERT_ID();
+            """;
+
+        using var conn = CreateConnection();
+        return await conn.ExecuteScalarAsync<int>(sql, new
+        {
+            p.ReferenciaId,
+            p.NombreContacto,
+            p.NPasoEnsayo,
+            NSalidaJson        = JsonSerializer.Serialize(p.NSalida),
+            p.ResistenciaNominal,
+            p.Tolerancia,
+            p.Offset,
+            p.FechaCreacion,
+            p.FechaModificacion,
+            p.PosX,
+            p.PosY
+        });
+    }
+
+    public async Task UpdateParametroAsync(ParametroEnsayo p)
+    {
+        const string sql = """
+            UPDATE parametros_ensayo SET
+                nombre_contacto    = @NombreContacto,
+                n_paso_ensayo      = @NPasoEnsayo,
+                n_salida_json      = @NSalidaJson,
+                resistencia_nominal= @ResistenciaNominal,
+                tolerancia         = @Tolerancia,
+                offset_val         = @Offset,
+                fecha_modificacion = @FechaModificacion,
+                pos_x              = @PosX,
+                pos_y              = @PosY
+            WHERE id = @Id
+            """;
+
+        using var conn = CreateConnection();
+        await conn.ExecuteAsync(sql, new
+        {
+            p.Id,
+            p.NombreContacto,
+            p.NPasoEnsayo,
+            NSalidaJson        = JsonSerializer.Serialize(p.NSalida),
+            p.ResistenciaNominal,
+            p.Tolerancia,
+            p.Offset,
+            p.FechaModificacion,
+            p.PosX,
+            p.PosY
+        });
+    }
+
+    public async Task DeleteParametroAsync(int id)
+    {
+        const string sql = "DELETE FROM parametros_ensayo WHERE id = @Id";
+        using var conn = CreateConnection();
+        await conn.ExecuteAsync(sql, new { Id = id });
+    }
+
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Resultados
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    public async Task<IEnumerable<Resultado>> GetAllResultadosAsync()
+    {
+        const string sql = "SELECT * FROM resultados ORDER BY fecha_prueba DESC";
+        using var conn = CreateConnection();
+        var rows = await conn.QueryAsync(sql);
+        return rows.Select(MapResultado);
+    }
+
+    public async Task<IEnumerable<Resultado>> GetResultadosByReferenciaAsync(int referenciaId)
+    {
+        const string sql = """
+            SELECT * FROM resultados
+            WHERE referencia_id = @ReferenciaId
+            ORDER BY fecha_prueba DESC
+            """;
+
+        using var conn = CreateConnection();
+        var rows = await conn.QueryAsync(sql, new { ReferenciaId = referenciaId });
+        return rows.Select(MapResultado);
+    }
+
+    public async Task<Resultado?> GetResultadoByIdAsync(int id)
+    {
+        const string sql = "SELECT * FROM resultados WHERE id = @Id";
+        using var conn = CreateConnection();
+        var row = await conn.QueryFirstOrDefaultAsync(sql, new { Id = id });
+        return row is null ? null : MapResultado(row);
+    }
+
+    public async Task<int> InsertResultadoAsync(Resultado r)
+    {
+        const string sql = """
+            INSERT INTO resultados
+                (referencia_id, fecha_prueba, resultado, operario, lote)
+            VALUES
+                (@ReferenciaId, @FechaPrueba, @ResultadoGlobal, @Operario, @Lote);
+            SELECT LAST_INSERT_ID();
+            """;
+
+        using var conn = CreateConnection();
+        return await conn.ExecuteScalarAsync<int>(sql, new
+        {
+            r.ReferenciaId,
+            r.FechaPrueba,
+            r.ResultadoGlobal,
+            r.Operario,
+            r.Lote
+        });
+    }
+
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ResultadosDetalle
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    public async Task<IEnumerable<ResultadoDetalle>> GetDetallesByResultadoAsync(int resultadoId)
+    {
+        const string sql = """
+            SELECT * FROM resultados_detalle
+            WHERE resultado_id = @ResultadoId
+            ORDER BY n_paso_ensayo
+            """;
+
+        using var conn = CreateConnection();
+        var rows = await conn.QueryAsync(sql, new { ResultadoId = resultadoId });
+        return rows.Select(MapResultadoDetalle);
+    }
+
+    public async Task InsertDetalleAsync(ResultadoDetalle d)
+    {
+        const string sql = """
+            INSERT INTO resultados_detalle
+                (resultado_id, parametro_ensayo_id, nombre_contacto, n_paso_ensayo,
+                 resistencia_medida, valor_raw_vain, valor_raw_ve, resultado, timestamp_medicion)
+            VALUES
+                (@ResultadoId, @ParametroEnsayoId, @NombreContacto, @NPasoEnsayo,
+                 @ResistenciaMedida, @ValorRawVain, @ValorRawVe, @Resultado, @Timestamp)
+            """;
+
+        using var conn = CreateConnection();
+        await conn.ExecuteAsync(sql, new
+        {
+            d.ResultadoId,
+            d.ParametroEnsayoId,
+            d.NombreContacto,
+            d.NPasoEnsayo,
+            d.ResistenciaMedida,
+            d.ValorRawVain,
+            d.ValorRawVe,
+            d.Resultado,
+            d.Timestamp
+        });
+    }
+
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Utilidades
-    // ─────────────────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     public async Task<bool> TestConnectionAsync()
     {
@@ -219,95 +300,138 @@ public class TestRepository : ITestRepository
             await conn.OpenAsync();
             return true;
         }
-        catch
-        {
-            return false;
-        }
+        catch { return false; }
     }
 
     public async Task InitializeDatabaseAsync()
     {
-        const string createTestParameters = """
-            CREATE TABLE IF NOT EXISTS test_parameters (
-                id                    INT AUTO_INCREMENT PRIMARY KEY,
-                test_name             VARCHAR(100) NOT NULL,
-                device_model          VARCHAR(50)  NOT NULL DEFAULT 'PC7866',
-                timeout_ms            INT          NOT NULL DEFAULT 5000,
-                tolerance_percent     DECIMAL(5,2) NOT NULL DEFAULT 5.00,
-                created_date          DATETIME     NOT NULL,
-                description           TEXT,
-                command_sequence_json LONGTEXT
+        const string sqlReferencias = """
+            CREATE TABLE IF NOT EXISTS referencias (
+                id                  INT AUTO_INCREMENT PRIMARY KEY,
+                b_activa            BOOLEAN  NOT NULL DEFAULT TRUE,
+                referencia          VARCHAR(255) NOT NULL UNIQUE,
+                descripcion         TEXT,
+                fecha_creacion      DATETIME NOT NULL,
+                fecha_modificacion  DATETIME NOT NULL,
+                imagen              LONGBLOB
             );
             """;
 
-        const string createTestResults = """
-            CREATE TABLE IF NOT EXISTS test_results (
+        const string sqlParametros = """
+            CREATE TABLE IF NOT EXISTS parametros_ensayo (
                 id                  INT AUTO_INCREMENT PRIMARY KEY,
-                test_parameters_id  INT          NOT NULL,
-                execution_date      DATETIME     NOT NULL,
-                status              VARCHAR(20)  NOT NULL,
-                observations        TEXT,
-                duration_ms         BIGINT       NOT NULL DEFAULT 0,
-                operator_name       VARCHAR(100),
-                serial_number       VARCHAR(100),
-                measurements_json   LONGTEXT,
-                FOREIGN KEY (test_parameters_id) REFERENCES test_parameters(id)
+                referencia_id       INT  NOT NULL,
+                nombre_contacto     VARCHAR(20)  NOT NULL,
+                n_paso_ensayo       INT  NOT NULL,
+                n_salida_json       LONGTEXT,
+                resistencia_nominal FLOAT NOT NULL DEFAULT 0,
+                tolerancia          FLOAT NOT NULL DEFAULT 0,
+                offset_val          FLOAT NOT NULL DEFAULT 0,
+                fecha_creacion      DATETIME NOT NULL,
+                fecha_modificacion  DATETIME NOT NULL,
+                pos_x               INT NOT NULL DEFAULT 0,
+                pos_y               INT NOT NULL DEFAULT 0,
+                FOREIGN KEY (referencia_id) REFERENCES referencias(id)
+            );
+            """;
+
+        const string sqlResultados = """
+            CREATE TABLE IF NOT EXISTS resultados (
+                id              INT AUTO_INCREMENT PRIMARY KEY,
+                referencia_id   INT  NOT NULL,
+                fecha_prueba    DATETIME NOT NULL,
+                resultado       BOOLEAN  NOT NULL,
+                operario        VARCHAR(100),
+                lote            VARCHAR(100),
+                FOREIGN KEY (referencia_id) REFERENCES referencias(id)
+            );
+            """;
+
+        const string sqlDetalle = """
+            CREATE TABLE IF NOT EXISTS resultados_detalle (
+                id                  INT AUTO_INCREMENT PRIMARY KEY,
+                resultado_id        INT  NOT NULL,
+                parametro_ensayo_id INT  NOT NULL,
+                nombre_contacto     VARCHAR(20),
+                n_paso_ensayo       INT  NOT NULL,
+                resistencia_medida  FLOAT NOT NULL,
+                valor_raw_vain      INT   NOT NULL DEFAULT 0,
+                valor_raw_ve        INT   NOT NULL DEFAULT 0,
+                resultado           BOOLEAN NOT NULL,
+                timestamp_medicion  DATETIME NOT NULL,
+                FOREIGN KEY (resultado_id) REFERENCES resultados(id)
             );
             """;
 
         using var conn = CreateConnection();
-        await conn.ExecuteAsync(createTestParameters);
-        await conn.ExecuteAsync(createTestResults);
+        await conn.ExecuteAsync(sqlReferencias);
+        await conn.ExecuteAsync(sqlParametros);
+        await conn.ExecuteAsync(sqlResultados);
+        await conn.ExecuteAsync(sqlDetalle);
     }
 
     public void Dispose() { }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Mappers privados
-    // ─────────────────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    private static TestParameters MapTestParameters(dynamic row)
+    private static Referencia MapReferencia(dynamic row) => new()
     {
-        var p = new TestParameters
-        {
-            Id              = (int)row.id,
-            TestName        = (string)row.test_name,
-            DeviceModel     = (string)row.device_model,
-            TimeoutMs       = (int)row.timeout_ms,
-            TolerancePercent = (decimal)row.tolerance_percent,
-            CreatedDate     = (DateTime)row.created_date,
-            Description     = (string?)row.description
-        };
+        Id                 = (int)row.id,
+        BActiva            = (bool)row.b_activa,
+        ReferenciaNombre   = (string)row.referencia,
+        Descripcion        = (string?)row.descripcion ?? string.Empty,
+        FechaCreacion      = (DateTime)row.fecha_creacion,
+        FechaModificacion  = (DateTime)row.fecha_modificacion,
+        Imagen             = (byte[]?)row.imagen
+    };
 
-        string? json = (string?)row.command_sequence_json;
+    private static ParametroEnsayo MapParametroEnsayo(dynamic row)
+    {
+        bool[] salidas = new bool[48];
+        string? json = (string?)row.n_salida_json;
         if (!string.IsNullOrEmpty(json))
-        {
-            p.CommandSequence = JsonSerializer.Deserialize<List<MeasurementCommand>>(json) ?? new();
-        }
+            salidas = JsonSerializer.Deserialize<bool[]>(json) ?? salidas;
 
-        return p;
+        return new ParametroEnsayo
+        {
+            Id                 = (int)row.id,
+            ReferenciaId       = (int)row.referencia_id,
+            NombreContacto     = (string)row.nombre_contacto,
+            NPasoEnsayo        = (int)row.n_paso_ensayo,
+            NSalida            = salidas,
+            ResistenciaNominal = (float)row.resistencia_nominal,
+            Tolerancia         = (float)row.tolerancia,
+            Offset             = (float)row.offset_val,
+            FechaCreacion      = (DateTime)row.fecha_creacion,
+            FechaModificacion  = (DateTime)row.fecha_modificacion,
+            PosX               = (int)row.pos_x,
+            PosY               = (int)row.pos_y
+        };
     }
 
-    private static TestResult MapTestResult(dynamic row)
+    private static Resultado MapResultado(dynamic row) => new()
     {
-        var r = new TestResult
-        {
-            Id               = (int)row.id,
-            TestParametersId = (int)row.test_parameters_id,
-            ExecutionDate    = (DateTime)row.execution_date,
-            Status           = Enum.Parse<TestStatus>((string)row.status),
-            Observations     = (string?)row.observations,
-            Duration         = TimeSpan.FromMilliseconds((long)row.duration_ms),
-            OperatorName     = (string?)row.operator_name,
-            SerialNumber     = (string?)row.serial_number
-        };
+        Id              = (int)row.id,
+        ReferenciaId    = (int)row.referencia_id,
+        FechaPrueba     = (DateTime)row.fecha_prueba,
+        ResultadoGlobal = (bool)row.resultado,
+        Operario        = (string?)row.operario ?? string.Empty,
+        Lote            = (string?)row.lote ?? string.Empty
+    };
 
-        string? json = (string?)row.measurements_json;
-        if (!string.IsNullOrEmpty(json))
-        {
-            r.Measurements = JsonSerializer.Deserialize<List<MeasurementResult>>(json) ?? new();
-        }
-
-        return r;
-    }
+    private static ResultadoDetalle MapResultadoDetalle(dynamic row) => new()
+    {
+        Id                = (int)row.id,
+        ResultadoId       = (int)row.resultado_id,
+        ParametroEnsayoId = (int)row.parametro_ensayo_id,
+        NombreContacto    = (string?)row.nombre_contacto ?? string.Empty,
+        NPasoEnsayo       = (int)row.n_paso_ensayo,
+        ResistenciaMedida = (float)row.resistencia_medida,
+        ValorRawVain      = (int)row.valor_raw_vain,
+        ValorRawVe        = (int)row.valor_raw_ve,
+        Resultado         = (bool)row.resultado,
+        Timestamp         = (DateTime)row.timestamp_medicion
+    };
 }

@@ -3,25 +3,36 @@ using PC7866.Models;
 namespace PC7866.Services.Database;
 
 /// <summary>
-/// Repositorio para gestionar TestParameters y TestResult en la base de datos
+/// Repositorio principal de la aplicación PC7866.
+/// Gestiona Referencias, ParametrosEnsayo, Resultados y ResultadosDetalle.
 /// </summary>
 public interface ITestRepository : IDisposable
 {
-    // --- TestParameters ---
-    Task<IEnumerable<TestParameters>> GetAllTestParametersAsync();
-    Task<TestParameters?> GetTestParametersByIdAsync(int id);
-    Task<int> InsertTestParametersAsync(TestParameters parameters);
-    Task UpdateTestParametersAsync(TestParameters parameters);
-    Task DeleteTestParametersAsync(int id);
+    // ── Referencias ──────────────────────────────────────────────────────────
+    Task<IEnumerable<Referencia>> GetAllReferenciasAsync(bool soloActivas = false);
+    Task<Referencia?> GetReferenciaByIdAsync(int id);
+    Task<int>  InsertReferenciaAsync(Referencia referencia);
+    Task       UpdateReferenciaAsync(Referencia referencia);
+    Task       SetReferenciaActivaAsync(int id, bool activa);
 
-    // --- TestResult ---
-    Task<IEnumerable<TestResult>> GetAllTestResultsAsync();
-    Task<IEnumerable<TestResult>> GetTestResultsByParametersIdAsync(int parametersId);
-    Task<TestResult?> GetTestResultByIdAsync(int id);
-    Task<int> InsertTestResultAsync(TestResult result);
-    Task UpdateTestResultAsync(TestResult result);
+    // ── ParametrosEnsayo ─────────────────────────────────────────────────────
+    Task<IEnumerable<ParametroEnsayo>> GetParametrosByReferenciaAsync(int referenciaId);
+    Task<ParametroEnsayo?> GetParametroByIdAsync(int id);
+    Task<int>  InsertParametroAsync(ParametroEnsayo parametro);
+    Task       UpdateParametroAsync(ParametroEnsayo parametro);
+    Task       DeleteParametroAsync(int id);
 
-    // --- Utilidades ---
+    // ── Resultados ───────────────────────────────────────────────────────────
+    Task<IEnumerable<Resultado>> GetAllResultadosAsync();
+    Task<IEnumerable<Resultado>> GetResultadosByReferenciaAsync(int referenciaId);
+    Task<Resultado?> GetResultadoByIdAsync(int id);
+    Task<int>  InsertResultadoAsync(Resultado resultado);
+
+    // ── ResultadosDetalle ────────────────────────────────────────────────────
+    Task<IEnumerable<ResultadoDetalle>> GetDetallesByResultadoAsync(int resultadoId);
+    Task       InsertDetalleAsync(ResultadoDetalle detalle);
+
+    // ── Utilidades ───────────────────────────────────────────────────────────
     Task<bool> TestConnectionAsync();
-    Task InitializeDatabaseAsync();
+    Task       InitializeDatabaseAsync();
 }

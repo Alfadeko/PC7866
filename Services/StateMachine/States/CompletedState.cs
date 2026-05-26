@@ -1,9 +1,7 @@
-using PC7866.Models;
-
 namespace PC7866.Services.StateMachine.States;
 
 /// <summary>
-/// Estado: completado – calcula duración y emite el reporte final
+/// Estado: completado – emite el reporte final de progreso.
 /// </summary>
 public class CompletedState : ITestState
 {
@@ -11,19 +9,17 @@ public class CompletedState : ITestState
 
     public Task<TestState> ExecuteAsync(TestContext context)
     {
-        context.Result.Duration = DateTime.Now - context.Result.ExecutionDate;
-
-        string statusIcon = context.Result.Status == TestStatus.Passed ? "✅" : "❌";
-        int passed = context.Result.Measurements.Count(m => m.Success);
-        int total  = context.Result.Measurements.Count;
+        int total  = context.Parametros.Count;
+        int passed = context.Resultado.Detalles.Count(d => d.Resultado);
+        string icon = context.Resultado.ResultadoGlobal ? "✅" : "❌";
 
         context.Progress?.Report(new TestProgressReport
         {
             CurrentStep = total,
             TotalSteps  = total,
-            Message     = $"{statusIcon} Test completado: {passed}/{total} mediciones correctas " +
-                          $"en {context.Result.Duration.TotalSeconds:F1}s",
-            State       = TestState.Completed
+            Message     = $"{icon} Ensayo completado: {passed}/{total} pasos OK",
+            State       = TestState.Completed,
+            StepOk      = context.Resultado.ResultadoGlobal
         });
 
         return Task.FromResult(TestState.Idle);

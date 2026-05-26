@@ -1,9 +1,7 @@
-using PC7866.Models;
-
 namespace PC7866.Services.StateMachine.States;
 
 /// <summary>
-/// Estado: inicialización – verifica que el puerto esté abierto y prepara el resultado
+/// Estado: inicialización – verifica que el puerto esté abierto y prepara el resultado.
 /// </summary>
 public class InitializingState : ITestState
 {
@@ -14,21 +12,19 @@ public class InitializingState : ITestState
         context.Progress?.Report(new TestProgressReport
         {
             CurrentStep = 0,
-            TotalSteps  = context.Parameters.CommandSequence.Count,
-            Message     = "Inicializando test…",
+            TotalSteps  = context.Parametros.Count,
+            Message     = "Inicializando ensayo…",
             State       = TestState.Initializing
         });
 
         if (!context.SerialPort.IsOpen)
         {
-            context.Result.Status = TestStatus.Error;
-            context.Result.Observations = "Puerto serie no está abierto";
+            context.Resultado.ResultadoGlobal = false;
             return Task.FromResult(TestState.Error);
         }
 
-        context.Result.ExecutionDate = DateTime.Now;
-        context.Result.Status        = TestStatus.Running;
-        context.Result.Measurements.Clear();
+        context.Resultado.FechaPrueba = DateTime.Now;
+        context.Resultado.Detalles.Clear();
 
         return Task.FromResult(TestState.Running);
     }

@@ -8,15 +8,23 @@ using PC7866.Utils;
 namespace PC7866.Views;
 
 /// <summary>
-/// Panel de ejecución automática de tests.
+/// Panel de ejecución automática del ensayo resistivo.
+/// Muestra imagen de la referencia con dots de color, lote/operario,
+/// resultados por paso y barra de progreso.
 /// </summary>
 public partial class AutomaticTestPanel : UserControl
 {
     private readonly ISerialPortService _serialPort;
-    private readonly CommandParser      _parser;
-    private readonly TestStateMachine   _stateMachine;
-    private ITestRepository?            _repository;
-    private CancellationTokenSource?    _cts;
+    private readonly CommandParser _parser;
+    private readonly TestStateMachine _stateMachine;
+    private ITestRepository? _repository;
+    private CancellationTokenSource? _cts;
+
+    private Referencia? _referenciaActual;
+    private List<ParametroEnsayo> _parametros = new();
+
+    // Colores de los dots: gris=no medido, verde=OK, rojo=NOK
+    private readonly Dictionary<int, Color> _dotColors = new();
 
     public AutomaticTestPanel()
     {
@@ -25,7 +33,8 @@ public partial class AutomaticTestPanel : UserControl
         _serialPort   = new SerialPortService();
         _parser       = new CommandParser();
         _stateMachine = new TestStateMachine();
-        _stateMachine.StateChanged += (_, s) => Invoke(() => lblMachineState.Text = $"Estado: {s}");
+        _stateMachine.StateChanged += (_, s) =>
+            Invoke(() => lblMachineState.Text = $"Estado: {s}");
 
         InitializeControls();
         AttachEventHandlers();
@@ -45,30 +54,34 @@ public partial class AutomaticTestPanel : UserControl
         cmbBaudRate.SelectedItem = AppSettings.Instance.DefaultBaudRate;
 
         SetConnectedState(false);
-        btnStartTest.Enabled = false;
-        btnAbortTest.Enabled = false;
-        progressBar.Value    = 0;
-        lblCurrentStep.Text  = "—";
-        lblMachineState.Text = "Estado: Idle";
+        btnStartTest.Enabled    = false;
+        btnAbortTest.Enabled    = false;
+        progressBar.Value       = 0;
+        lblCurrentStep.Text     = "—";
+        lblMachineState.Text    = "Estado: Idle";
     }
 
     private void AttachEventHandlers()
     {
-        btnConnect.Click    += BtnConnect_Click;
-        btnDisconnect.Click += BtnDisconnect_Click;
-        btnStartTest.Click  += BtnStartTest_Click;
-        btnAbortTest.Click  += (_, _) => { _cts?.Cancel(); AddLog("⛔ Abortando…", LogLevel.Warning); };
-        btnRefreshPorts.Click += (_, _) =>
+        btnConnect.Click        += BtnConnect_Click;
+        btnDisconnect.Click     += BtnDisconnect_Click;
+        btnStartTest.Click      += BtnStartTest_Click;
+        btnAbortTest.Click      += (_, _) => { _cts?.Cancel(); AddLog("⛔ Abortando…", LogLevel.Warning); };
+        btnRefreshPorts.Click   += (_, _) =>
         {
             cmbPort.Items.Clear();
             cmbPort.Items.AddRange(_serialPort.GetAvailablePorts());
             if (cmbPort.Items.Count > 0) cmbPort.SelectedIndex = 0;
         };
-        btnRefreshProfiles.Click += async (_, _) => await LoadTestParametersAsync();
+        btnRefreshRefs.Click    += async (_, _) => await LoadReferenciasAsync();
+
+        cmbReferencia.SelectedIndexChanged += async (_, _) => await OnReferenciaChangedAsync();
 
         _serialPort.PortOpened    += (_, _) => Invoke(() => SetConnectedState(true));
         _serialPort.PortClosed    += (_, _) => Invoke(() => SetConnectedState(false));
         _serialPort.ErrorOccurred += (_, err) => Invoke(() => AddLog($"❌ {err}", LogLevel.Error));
+
+        picReferencia.Paint += PicReferencia_Paint;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -84,11 +97,11 @@ public partial class AutomaticTestPanel : UserControl
             {
                 await _repository.InitializeDatabaseAsync();
                 AddLog("🗄️ Base de datos conectada", LogLevel.Info);
-                await LoadTestParametersAsync();
+                await LoadReferenciasAsync();
             }
             else
             {
-                AddLog("⚠️ Sin conexión a la base de datos. Compruebe la configuración.", LogLevel.Warning);
+                AddLog("⚠️ Sin conexión a la base de datos.", LogLevel.Warning);
             }
         }
         catch (Exception ex)
@@ -97,23 +110,49 @@ public partial class AutomaticTestPanel : UserControl
         }
     }
 
-    private async Task LoadTestParametersAsync()
+    private async Task LoadReferenciasAsync()
     {
         if (_repository is null) return;
         try
         {
-            var list = await _repository.GetAllTestParametersAsync();
-            cmbTestParameters.Items.Clear();
-            foreach (var tp in list) cmbTestParameters.Items.Add(tp);
-            cmbTestParameters.DisplayMember = "TestName";
-            if (cmbTestParameters.Items.Count > 0) cmbTestParameters.SelectedIndex = 0;
-            AddLog($"📋 {cmbTestParameters.Items.Count} perfiles cargados", LogLevel.Info);
-            UpdateStartButton();
+            var refs = await _repository.GetAllReferenciasAsync();
+            cmbReferencia.Items.Clear();
+            foreach (var r in refs) cmbReferencia.Items.Add(r);
+            cmbReferencia.DisplayMember = "ReferenciaNombre";
+            if (cmbReferencia.Items.Count > 0) cmbReferencia.SelectedIndex = 0;
+            AddLog($"📋 {cmbReferencia.Items.Count} referencias cargadas", LogLevel.Info);
         }
         catch (Exception ex)
         {
-            AddLog($"❌ Error cargando perfiles: {ex.Message}", LogLevel.Error);
+            AddLog($"❌ Error cargando referencias: {ex.Message}", LogLevel.Error);
         }
+    }
+
+    private async Task OnReferenciaChangedAsync()
+    {
+        if (cmbReferencia.SelectedItem is not Referencia ref_ || _repository is null) return;
+        _referenciaActual = ref_;
+        _parametros = (await _repository.GetParametrosByReferenciaAsync(ref_.Id)).ToList();
+
+        // Resetear dots a gris
+        _dotColors.Clear();
+        foreach (var p in _parametros) _dotColors[p.Id] = Color.Gray;
+
+        // Mostrar imagen si existe
+        if (ref_.Imagen?.Length > 0)
+        {
+            using var ms = new MemoryStream(ref_.Imagen);
+            picReferencia.Image = Image.FromStream(ms);
+        }
+        else
+        {
+            picReferencia.Image = null;
+        }
+
+        picReferencia.Invalidate();
+        gridResultados.Rows.Clear();
+        UpdateStartButton();
+        AddLog($"📝 Referencia: {ref_.ReferenciaNombre} — {_parametros.Count} pasos", LogLevel.Info);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -125,8 +164,8 @@ public partial class AutomaticTestPanel : UserControl
         if (cmbPort.SelectedItem is null || cmbBaudRate.SelectedItem is null) return;
         btnConnect.Enabled = false;
         string port = cmbPort.SelectedItem.ToString()!;
-        int    baud = (int)cmbBaudRate.SelectedItem;
-        bool   ok   = await Task.Run(() => _serialPort.Open(port, baud));
+        int baud    = (int)cmbBaudRate.SelectedItem;
+        bool ok     = await Task.Run(() => _serialPort.Open(port, baud));
         if (!ok) { btnConnect.Enabled = true; AddLog($"❌ No se pudo abrir {port}", LogLevel.Error); }
     }
 
@@ -135,74 +174,96 @@ public partial class AutomaticTestPanel : UserControl
     private void SetConnectedState(bool connected)
     {
         lblConnectionStatus.Text      = connected ? $"● {_serialPort.CurrentPort}" : "○ Sin conexión";
-        lblConnectionStatus.ForeColor = connected ? System.Drawing.Color.Green : System.Drawing.Color.Red;
-        btnConnect.Enabled    = !connected;
-        btnDisconnect.Enabled =  connected;
-        cmbPort.Enabled       = !connected;
-        cmbBaudRate.Enabled   = !connected;
+        lblConnectionStatus.ForeColor = connected ? Color.Green : Color.Red;
+        btnConnect.Enabled            = !connected;
+        btnDisconnect.Enabled         = connected;
+        cmbPort.Enabled               = !connected;
+        cmbBaudRate.Enabled           = !connected;
         UpdateStartButton();
         if (connected) AddLog($"✅ Conectado: {_serialPort.CurrentPort}", LogLevel.Info);
     }
 
     private void UpdateStartButton() =>
-        btnStartTest.Enabled = _serialPort.IsOpen && cmbTestParameters.Items.Count > 0;
+        btnStartTest.Enabled = _serialPort.IsOpen && _referenciaActual is not null && _parametros.Count > 0;
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Ejecución del test
+    // Ejecución del ensayo
     // ─────────────────────────────────────────────────────────────────────────
 
     private async void BtnStartTest_Click(object? sender, EventArgs e)
     {
-        if (cmbTestParameters.SelectedItem is not TestParameters parameters)
+        if (_referenciaActual is null || _parametros.Count == 0)
         {
-            MessageBox.Show("Seleccione un perfil de test.", "Aviso",
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
-        if (parameters.CommandSequence.Count == 0)
-        {
-            MessageBox.Show("El perfil no tiene comandos definidos.", "Aviso",
+            MessageBox.Show("Seleccione una referencia con parámetros definidos.", "Aviso",
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
+        string operario = txtOperario.Text.Trim();
+        string lote     = txtLote.Text.Trim();
+
+        if (string.IsNullOrEmpty(operario))
+        {
+            MessageBox.Show("Introduzca el nombre del operario.", "Aviso",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            txtOperario.Focus();
+            return;
+        }
+
         _cts = new CancellationTokenSource();
-        btnStartTest.Enabled = false;
-        btnAbortTest.Enabled = true;
-        progressBar.Value    = 0;
-        progressBar.Maximum  = parameters.CommandSequence.Count;
-        txtLog.Clear();
+        btnStartTest.Enabled  = false;
+        btnAbortTest.Enabled  = true;
+        progressBar.Value     = 0;
+        progressBar.Maximum   = _parametros.Count;
+        gridResultados.Rows.Clear();
+
+        // Resetear dots a gris
+        foreach (var p in _parametros) _dotColors[p.Id] = Color.Gray;
+        picReferencia.Invalidate();
 
         var progress = new Progress<TestProgressReport>(r =>
         {
             progressBar.Value   = Math.Min(r.CurrentStep, progressBar.Maximum);
             lblCurrentStep.Text = r.Message;
-            AddLog(r.Message, LogLevel.Info);
         });
 
-        AddLog($"▶️ Test: {parameters.TestName}", LogLevel.Info);
+        AddLog($"▶️ Ensayo: {_referenciaActual.ReferenciaNombre} | Op: {operario} | Lote: {lote}", LogLevel.Info);
 
         try
         {
-            var result = await _stateMachine.RunAsync(
-                parameters, _serialPort, _parser, progress, _cts.Token);
+            var resultado = await _stateMachine.RunAsync(
+                _referenciaActual,
+                _parametros,
+                operario,
+                lote,
+                _serialPort,
+                _parser,
+                progress,
+                OnStepCompleted,
+                AppSettings.Instance.DefaultTimeout,
+                _cts.Token);
 
-            ShowTestResult(result);
+            ShowFinalResult(resultado);
 
             if (_repository is not null)
             {
-                result.Id = await _repository.InsertTestResultAsync(result);
-                AddLog($"💾 Resultado guardado (ID {result.Id})", LogLevel.Info);
+                resultado.Id = await _repository.InsertResultadoAsync(resultado);
+                foreach (var d in resultado.Detalles)
+                {
+                    d.ResultadoId = resultado.Id;
+                    await _repository.InsertDetalleAsync(d);
+                }
+                AddLog($"💾 Resultado guardado (ID {resultado.Id})", LogLevel.Info);
             }
         }
         catch (OperationCanceledException)
         {
-            AddLog("⛔ Test cancelado", LogLevel.Warning);
+            AddLog("⛔ Ensayo cancelado", LogLevel.Warning);
         }
         catch (Exception ex)
         {
             AddLog($"❌ {ex.Message}", LogLevel.Error);
-            Logger.Instance.Error($"Error test automático: {ex}");
+            Logger.Instance.Error($"Error ensayo automático: {ex}");
         }
         finally
         {
@@ -213,16 +274,102 @@ public partial class AutomaticTestPanel : UserControl
         }
     }
 
-    private void ShowTestResult(TestResult result)
+    private void OnStepCompleted(ParametroEnsayo paso, ResultadoDetalle detalle)
     {
-        int    passed  = result.Measurements.Count(m => m.Success);
-        int    total   = result.Measurements.Count;
-        string icon    = result.Status == TestStatus.Passed ? "✅" : "❌";
-        string summary = $"{icon} {result.Status}  |  {passed}/{total} OK  |  {result.Duration.TotalSeconds:F1}s";
-        lblCurrentStep.Text = summary;
-        AddLog(summary, result.Status == TestStatus.Passed ? LogLevel.Info : LogLevel.Warning);
-        if (!string.IsNullOrEmpty(result.Observations))
-            AddLog($"ℹ️ {result.Observations}", LogLevel.Warning);
+        if (InvokeRequired) { Invoke(() => OnStepCompleted(paso, detalle)); return; }
+
+        // Actualizar dot
+        _dotColors[paso.Id] = detalle.Resultado ? Color.Green : Color.Red;
+        picReferencia.Invalidate();
+
+        // Añadir fila al grid
+        string resultado = detalle.Resultado ? "✅ OK" : "❌ NOK";
+        gridResultados.Rows.Add(
+            paso.NPasoEnsayo,
+            paso.NombreContacto,
+            $"{detalle.ResistenciaMedida:F2}",
+            $"{paso.ResistenciaNominal:F2} ±{paso.Tolerancia:F2}",
+            resultado);
+
+        // Color de fila
+        var row = gridResultados.Rows[gridResultados.Rows.Count - 1];
+        row.DefaultCellStyle.BackColor = detalle.Resultado
+            ? Color.FromArgb(220, 255, 220)
+            : Color.FromArgb(255, 220, 220);
+
+        AddLog($"  Paso {paso.NPasoEnsayo} {paso.NombreContacto}: " +
+               $"{detalle.ResistenciaMedida:F2} Ω → {resultado}", LogLevel.Info);
+    }
+
+    private void ShowFinalResult(Resultado resultado)
+    {
+        string icon = resultado.ResultadoGlobal ? "✅ BUENO" : "❌ MALO";
+        int ok      = resultado.Detalles.Count(d => d.Resultado);
+        lblCurrentStep.Text = $"{icon}  {ok}/{resultado.Detalles.Count} pasos OK";
+        AddLog($"{icon} — {ok}/{resultado.Detalles.Count}", LogLevel.Info);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Imagen y dots
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void PicReferencia_Paint(object? sender, PaintEventArgs e)
+    {
+        if (_parametros.Count == 0) return;
+
+        var g = e.Graphics;
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+        const int   R    = 10;
+        const float MaxC = 4000f;
+
+        RectangleF imgRect = GetImageRect(picReferencia);
+
+        foreach (var p in _parametros)
+        {
+            if (p.PosX == 0 && p.PosY == 0) continue;
+
+            if (!_dotColors.TryGetValue(p.Id, out var color)) color = Color.Gray;
+
+            // Transformar coordenadas de imagen (0-4000) a píxeles del control
+            float cx = imgRect.Left + (p.PosX / MaxC) * imgRect.Width;
+            float cy = imgRect.Top  + (p.PosY / MaxC) * imgRect.Height;
+
+            using var brush = new SolidBrush(Color.FromArgb(200, color));
+            using var pen   = new Pen(Color.White, 1.5f);
+            g.FillEllipse(brush, cx - R, cy - R, R * 2, R * 2);
+            g.DrawEllipse(pen,   cx - R, cy - R, R * 2, R * 2);
+
+            // Número de paso dentro del dot
+            using var fnt      = new Font("Segoe UI", 7f, FontStyle.Bold);
+            using var brushTxt = new SolidBrush(Color.White);
+            var label = p.NPasoEnsayo.ToString();
+            var sz    = g.MeasureString(label, fnt);
+            g.DrawString(label, fnt, brushTxt, cx - sz.Width / 2, cy - sz.Height / 2);
+        }
+    }
+
+    /// <summary>
+    /// Calcula el rectángulo que ocupa la imagen dentro de un PictureBox
+    /// con SizeMode = Zoom (mantiene proporción y centra).
+    /// </summary>
+    private static RectangleF GetImageRect(PictureBox pic)
+    {
+        if (pic.Image is null)
+            return new RectangleF(0, 0, pic.Width, pic.Height);
+
+        float imgW  = pic.Image.Width;
+        float imgH  = pic.Image.Height;
+        float ctlW  = pic.Width;
+        float ctlH  = pic.Height;
+
+        float scale   = Math.Min(ctlW / imgW, ctlH / imgH);
+        float drawW   = imgW * scale;
+        float drawH   = imgH * scale;
+        float offsetX = (ctlW - drawW) / 2f;
+        float offsetY = (ctlH - drawH) / 2f;
+
+        return new RectangleF(offsetX, offsetY, drawW, drawH);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -246,4 +393,6 @@ public partial class AutomaticTestPanel : UserControl
         _repository?.Dispose();
         base.OnHandleDestroyed(e);
     }
+
+    private void lblConnectionStatus_Click(object sender, EventArgs e) { }
 }
